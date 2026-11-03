@@ -1,8 +1,8 @@
 # Vercel staging preview
 
-The initial Vercel deployment is a static, public-facing preview of the v3 reading interface. It serves only the fictional records in `deploy/staging-stories.json`; it does not read `data/stories.json`, connect to PostgreSQL, or enable login and saved preferences. The page displays a staging banner so the synthetic content is clear.
+The Vercel staging deployment serves the existing `frontend/` prototype UI with only the explicitly synthetic records in `deploy/staging-stories.json`. The build replaces the prototype's bundled story data before publishing it, so the real-content snapshot in `data/stories.json` is not included. The page displays a staging banner. Sign-in, the API, PostgreSQL, and account features are not connected.
 
-Vercel builds the static output with `python3 deploy/build_vercel_staging.py` and publishes `public/`. The rewrites expose the browser's existing `/api/v1/public-config` and `/api/v1/stories` requests as static JSON files. The root URL opens the v3 app.
+Vercel builds the static output with `python3 deploy/build_vercel_staging.py` and publishes `public/`. The root URL and `/app` open the prototype interface. Its layout and styling come from `frontend/index.template.html` and `frontend/app.js`; the build injects the fictional demo records and labels the page as staging. The real-content build `frontend/index.html` and local authentication fixture are excluded from Vercel's build upload.
 
 To view the same preview on a laptop before Vercel is connected, run:
 
@@ -13,7 +13,7 @@ python3 deploy/preview_server.py
 
 Then open `http://localhost:4173/` in a browser. Stop the local server with `Ctrl+C`.
 
-This deployment is for interface review only. It does not exercise the authenticated API or validate database migrations, OIDC, encryption-key handling, RLS, or production operations. Do not add company or user data to this preview.
+This deployment is for interface review only. It does not exercise the authenticated API or validate database migrations, OIDC, encryption-key handling, RLS, or production operations. The story content is synthetic, and profile, history, and saved-story state stays in the current browser session. Do not add company or user data to this preview.
 
 ## Full API-backed staging later
 

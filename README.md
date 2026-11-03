@@ -10,13 +10,13 @@ based `v2/` prototype remain separate. This is not a declaration of GDPR
 compliance; before using real customer data, follow the deployment and
 privacy gaps in [`docs/SAFE_BACKEND.md`](docs/SAFE_BACKEND.md).
 
-## Deeplitics v3 app
+## Current Vercel preview
 
-The new API-backed reading experience lives in `v3/` and is served at
-`/app/`. It keeps the existing prototype unchanged. Story browsing is public;
-saved stories and topic preferences require a verified OIDC login and are
-encrypted per workspace member. See [`v3/README.md`](v3/README.md) for setup,
-OIDC registration and the hardware deployment plan.
+The Vercel staging preview uses the existing `frontend/` prototype interface
+with only the explicitly synthetic stories from `deploy/staging-stories.json`.
+It is a static visual preview: sign-in and the API-backed features are not
+connected. See [`docs/VERCEL_STAGING.md`](docs/VERCEL_STAGING.md) for local
+preview instructions. The separate API-backed app remains in `v3/` for later.
 
 Ziel: politische Nachrichten aus vielen Quellen automatisch zu **Storys**
 verdichten, die zeigen **wie Ereignisse, Akteure und Länder zusammenhängen**,

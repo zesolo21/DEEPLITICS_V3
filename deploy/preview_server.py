@@ -13,8 +13,7 @@ PUBLIC = ROOT / "public"
 ROUTES = {
     "/": "/app/index.html",
     "/app": "/app/index.html",
-    "/api/v1/public-config": "/api/v1/public-config.json",
-    "/api/v1/stories": "/api/v1/stories.json",
+    "/app/": "/app/index.html",
 }
 
 

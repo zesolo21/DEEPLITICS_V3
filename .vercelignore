@@ -3,10 +3,11 @@
 backend/
 data/
 docs/
-frontend/
+frontend/index.html
 path/
 pipeline/
 v2/
+deploy/local-auth/
 Dockerfile.backend
 docker-compose.backend.yml
 requirements.txt

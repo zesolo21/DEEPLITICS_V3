@@ -7,7 +7,6 @@
   "rewrites": [
     { "source": "/", "destination": "/app/index.html" },
     { "source": "/app", "destination": "/app/index.html" },
-    { "source": "/api/v1/public-config", "destination": "/api/v1/public-config.json" },
-    { "source": "/api/v1/stories", "destination": "/api/v1/stories.json" }
+    { "source": "/app/", "destination": "/app/index.html" }
   ]
 }
