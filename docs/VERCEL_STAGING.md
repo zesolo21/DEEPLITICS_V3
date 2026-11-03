@@ -4,6 +4,15 @@ The initial Vercel deployment is a static, public-facing preview of the v3 readi
 
 Vercel builds the static output with `python3 deploy/build_vercel_staging.py` and publishes `public/`. The rewrites expose the browser's existing `/api/v1/public-config` and `/api/v1/stories` requests as static JSON files. The root URL opens the v3 app.
 
+To view the same preview on a laptop before Vercel is connected, run:
+
+```sh
+python3 deploy/build_vercel_staging.py
+python3 deploy/preview_server.py
+```
+
+Then open `http://localhost:4173/` in a browser. Stop the local server with `Ctrl+C`.
+
 This deployment is for interface review only. It does not exercise the authenticated API or validate database migrations, OIDC, encryption-key handling, RLS, or production operations. Do not add company or user data to this preview.
 
 ## Full API-backed staging later
