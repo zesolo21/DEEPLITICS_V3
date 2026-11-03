@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from pathlib import Path
 
 from flask import Blueprint, current_app, g, jsonify, request
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy import select
+from sqlalchemy import select, text
 
-from backend.auth import require_role, require_tenant
+from backend.auth import _decode_token, require_role, require_tenant
 from backend.crypto import EncryptionConfigurationError, EncryptedValue, decrypt_text, encrypt_text
 from backend.extensions import db
-from backend.models import AuditEvent, MemberPreference, Tenant, WorkspaceItem, new_id, utcnow
+from backend.identity import identity_digest
+from backend.models import AuditEvent, MemberPreference, Membership, Tenant, WorkspaceItem, new_id, utcnow
 
 api = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 _PREFERENCE_TOPICS = {"security", "diplomacy", "trade", "rights", "conflict", "surveillance"}
@@ -62,6 +64,8 @@ def public_config():
     config = {
         "auth_enabled": auth_enabled,
         "default_tenant_id": current_app.config.get("DEFAULT_TENANT_ID") or None,
+        "signup_enabled": bool(current_app.config.get("STAGING_SIGNUP_ENABLED")),
+        "environment": "staging" if current_app.config.get("STAGING_SIGNUP_ENABLED") else current_app.config.get("APP_ENV"),
     }
     if auth_enabled:
         config["oidc"] = {
@@ -75,13 +79,91 @@ def public_config():
     return jsonify(config)
 
 
+@api.post("/staging-signup")
+def staging_signup():
+    """Create a member only in the disposable, loopback-only development workspace."""
+    if (current_app.config.get("APP_ENV") != "development"
+            or not current_app.config.get("STAGING_SIGNUP_ENABLED")
+            or request.remote_addr not in {"127.0.0.1", "::1"}):
+        return jsonify(error="Not found."), 404
+
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return jsonify(error="Authentication required."), 401
+    try:
+        claims = _decode_token(token.strip())
+    except RuntimeError:
+        return jsonify(error="Authentication service is not configured."), 503
+    except Exception:
+        return jsonify(error="Invalid or expired access token."), 401
+
+    tenant_id = current_app.config.get("DEFAULT_TENANT_ID")
+    issuer = claims.get("iss", "")
+    subject = claims.get("sub")
+    if (not tenant_id or request.headers.get("X-Tenant-ID") != tenant_id
+            or not issuer or not subject):
+        return jsonify(error="A valid staging workspace and identity are required."), 403
+
+    try:
+        subject_digest = identity_digest(issuer, subject)
+    except RuntimeError:
+        return jsonify(error="Authentication service is not configured."), 503
+
+    if db.engine.dialect.name == "postgresql":
+        db.session.execute(
+            text("SELECT set_config('app.current_tenant', :tenant_id, true)"),
+            {"tenant_id": tenant_id},
+        )
+    if db.session.get(Tenant, tenant_id) is None:
+        db.session.rollback()
+        return jsonify(error="The staging workspace is not initialized."), 503
+
+    existing = db.session.execute(select(Membership).where(
+        Membership.tenant_id == tenant_id,
+        Membership.issuer == issuer,
+        Membership.subject_digest == subject_digest,
+    )).scalar_one_or_none()
+    if existing:
+        active = existing.active
+        db.session.rollback()
+        if active:
+            return jsonify(status="already-active"), 200
+        return jsonify(error="This identity is not an active member of the staging workspace."), 403
+
+    membership = Membership(
+        tenant_id=tenant_id,
+        issuer=issuer,
+        subject_digest=subject_digest,
+        role="member",
+        active=True,
+    )
+    db.session.add(membership)
+    db.session.flush()
+    db.session.add(AuditEvent(
+        tenant_id=tenant_id,
+        actor_membership_id=membership.id,
+        action="membership.staging_self_registered",
+        resource_id=None,
+        request_id=uuid.uuid4().hex,
+    ))
+    db.session.commit()
+    return jsonify(status="created"), 201
+
+
 @api.get("/stories")
 def list_stories():
     """Serve the published story snapshot; this material is public, not tenant data."""
     path = Path(current_app.config["STORIES_PATH"])
     try:
         with path.open("r", encoding="utf-8") as story_file:
-            stories = json.load(story_file)
+            payload = json.load(story_file)
+        if (current_app.config.get("APP_ENV") == "development"
+                and isinstance(payload, dict)
+                and payload.get("environment") == "staging"):
+            stories = payload.get("stories")
+        else:
+            stories = payload
         if not isinstance(stories, list) or any(not isinstance(story, dict) for story in stories):
             raise ValueError("Story snapshot must be a JSON array.")
     except (OSError, ValueError, json.JSONDecodeError):

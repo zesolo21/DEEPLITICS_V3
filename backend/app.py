@@ -39,12 +39,17 @@ def create_app(test_config: dict | None = None) -> Flask:
         OIDC_TOKEN_ENDPOINT=os.environ.get("OIDC_TOKEN_ENDPOINT", ""),
         OIDC_REDIRECT_URI=os.environ.get("OIDC_REDIRECT_URI", ""),
         DEFAULT_TENANT_ID=os.environ.get("DEFAULT_TENANT_ID", ""),
-        STORIES_PATH=str(repository_root / "data" / "stories.json"),
+        STORIES_PATH=os.environ.get("STORIES_PATH") or str(repository_root / "data" / "stories.json"),
         V3_STATIC_DIR=str(repository_root / "v3"),
+        PROTOTYPE_STATIC_DIR=str(repository_root / "public" / "app"),
         APP_ENV=os.environ.get("APP_ENV", "development").lower(),
+        STAGING_SIGNUP_ENABLED=os.environ.get("STAGING_SIGNUP_ENABLED", "false").lower() == "true",
     )
     if test_config:
         app.config.update(test_config)
+
+    if app.config["STAGING_SIGNUP_ENABLED"] and app.config["APP_ENV"] != "development":
+        raise RuntimeError("Staging self-signup is only allowed with APP_ENV=development.")
 
     database_url = app.config.get("SQLALCHEMY_DATABASE_URI") or os.environ.get("DATABASE_URL", "")
     if database_url.startswith("postgres://"):
@@ -147,6 +152,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     def deeplitics_next_asset(asset_path: str):
         return send_from_directory(app.config["V3_STATIC_DIR"], asset_path)
 
+    @app.get("/prototype/")
+    def deeplitics_prototype_preview():
+        if app.config["APP_ENV"] != "development":
+            return jsonify(error="Not found."), 404
+        return send_from_directory(app.config["PROTOTYPE_STATIC_DIR"], "index.html")
+
     @app.get("/")
     def index():
         return jsonify(service="deeplitics-api", api_version="v1")
@@ -227,7 +238,14 @@ def create_app(test_config: dict | None = None) -> Flask:
         except ValueError as exc:
             raise click.ClickException("--tenant-id must be a UUID.") from exc
         issuer = _normalise_issuer(issuer)
-        if urlparse(issuer).scheme != "https" or not urlparse(issuer).netloc or not subject.strip() or len(subject) > 300:
+        parsed_issuer = urlparse(issuer)
+        local_development_issuer = (
+            app.config["APP_ENV"] == "development"
+            and parsed_issuer.scheme == "http"
+            and parsed_issuer.hostname in {"localhost", "127.0.0.1", "::1"}
+        )
+        if ((parsed_issuer.scheme != "https" and not local_development_issuer)
+                or not parsed_issuer.netloc or not subject.strip() or len(subject) > 300):
             raise click.ClickException("Issuer must be HTTPS and subject must be a non-empty OIDC sub.")
         db.session.execute(
             text("SELECT set_config('app.current_tenant', :tenant_id, true)"),

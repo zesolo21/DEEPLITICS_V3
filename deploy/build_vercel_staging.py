@@ -57,7 +57,7 @@ def main() -> None:
 
     banner = (
         '<div class="staging-banner" role="status">'
-        "STAGING PREVIEW · Synthetic demo stories only · Sign-in is not connected"
+        "STAGING PREVIEW · Synthetic demo stories only"
         "</div>"
     )
     banner_css = (

@@ -29,7 +29,12 @@ def _decode_token(token: str) -> dict:
     if not issuer or not audience or not jwks_url:
         raise RuntimeError("OIDC is not configured.")
     parsed = urlparse(jwks_url)
-    if parsed.scheme != "https" or not parsed.netloc:
+    local_development_jwks = (
+        current_app.config.get("APP_ENV") == "development"
+        and parsed.scheme == "http"
+        and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+    )
+    if (parsed.scheme != "https" and not local_development_jwks) or not parsed.netloc:
         raise RuntimeError("OIDC JWKS URL must use HTTPS.")
     client = current_app.extensions.get("deeplitics_jwks_client")
     if client is None:

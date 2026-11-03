@@ -1,6 +1,6 @@
 # Vercel staging preview
 
-The Vercel staging deployment serves the existing `frontend/` prototype UI with only the explicitly synthetic records in `deploy/staging-stories.json`. The build replaces the prototype's bundled story data before publishing it, so the real-content snapshot in `data/stories.json` is not included. The page displays a staging banner. Sign-in, the API, PostgreSQL, and account features are not connected.
+The Vercel staging deployment serves the existing `frontend/` prototype UI with only the explicitly synthetic records in `deploy/staging-stories.json`. The build replaces the prototype's bundled story data before publishing it, so the real-content snapshot in `data/stories.json` is not included. The profile contains sign-in and account controls, but they stay disabled in this static Vercel preview because no hosted OIDC provider, API, or PostgreSQL database is configured. The isolated local test setup enables those controls only on loopback.
 
 Vercel builds the static output with `python3 deploy/build_vercel_staging.py` and publishes `public/`. The root URL and `/app` open the prototype interface. Its layout and styling come from `frontend/index.template.html` and `frontend/app.js`; the build injects the fictional demo records and labels the page as staging. The real-content build `frontend/index.html` and local authentication fixture are excluded from Vercel's build upload.
 

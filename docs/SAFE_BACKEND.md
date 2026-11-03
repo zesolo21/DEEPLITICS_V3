@@ -12,17 +12,27 @@ This is an initial application-security foundation for company workspaces. It is
 - Workspace names, item titles, and item text encrypted using AES-GCM with per-tenant derived keys and field/record associated data. The identity-digest key is separate. A key ring permits content-key rotation: add a new key, set it active, re-encrypt existing records, then remove the old key only after confirming no records reference it. Keep the identity key stable or plan a controlled membership re-digest migration before rotating it.
 - Per-member app preferences (saved public story IDs and topic filters) encrypted before reaching Postgres. A member can read, update, and erase only their own preference row; another user in the same company cannot read it.
 - Workspace item listing, creation, retrieval, and deletion; a workspace-scoped audit-event view for owners/admins.
-- A parallel Deeplitics v3 reading app at `/app/`, with public story browsing and OIDC Authorization Code + PKCE login for private preferences. Access tokens stay in browser memory; only the short-lived PKCE verifier/state and workspace ID use `sessionStorage`. No email or profile name is requested or persisted.
+- OIDC Authorization Code + PKCE sign-in from the prototype profile and the parallel v3 reading app. Access tokens stay in browser memory; only the short-lived PKCE verifier/state and workspace ID use `sessionStorage`. No email or profile name is requested or persisted.
 - A minimal non-root Gunicorn image (`Dockerfile.backend`) and an opt-in local Compose app profile. The application port binds to loopback.
-- No public registration, cookie session, password handling, cross-tenant content search, or file upload.
+- No production public registration, cookie session, password handling, cross-tenant content search, or file upload. A separate local-only Keycloak fixture can enable account creation solely for a synthetic test workspace.
 - Strict CORS allowlisting when `CORS_ORIGINS` is set; wildcard origins are rejected.
 - GitHub Actions input validation for `max_stories`, plus workflow concurrency to prevent overlapping story-update pushes.
 
 ## Local setup
 
-Requirements: Python 3.11 or newer, Docker Compose, and an OIDC development tenant that can issue access tokens with the API audience configured below.
+Requirements: Python 3.11 or newer, PostgreSQL, and an OIDC identity provider that can issue access tokens with the API audience configured below. The repository includes a loopback-only Keycloak realm for synthetic local account-flow checks.
 
-1. Start a local Postgres database:
+For local sign-up and sign-in testing without an external identity provider, use
+the isolated Keycloak realm in [`deploy/local-auth/realm.json`](../deploy/local-auth/realm.json).
+Its registration flow and automatic membership provisioning are enabled only
+when `APP_ENV=development`, `STAGING_SIGNUP_ENABLED=true`, and the app is
+reached through loopback. Never enable that setting on Vercel or with real
+company data. The local synthetic story snapshot is selected through
+`STORIES_PATH`. Build the prototype preview, then serve it from the same-origin
+local API at `http://127.0.0.1:8000/prototype/`; the registration callback must
+use that exact URI.
+
+1. Start the local Postgres database:
 
    ```sh
    docker compose -f docker-compose.backend.yml up -d
@@ -36,7 +46,36 @@ Requirements: Python 3.11 or newer, Docker Compose, and an OIDC development tena
    pip install -r backend/requirements.txt
    ```
 
-3. Copy `.env.backend.example` to `.env.backend`; replace both example keys with fresh random 32-byte keys. Set the API issuer, audience, JWKS URL, and public browser OIDC client settings. Register Authorization Code + PKCE (S256), the exact redirect URI `http://127.0.0.1:5000/app/`, and allow the local app origin at the provider token endpoint. Do not create a browser client secret. Load the file into the shell without committing it:
+3. Copy `.env.backend.example` to `.env.backend`; replace both example keys with fresh random 32-byte keys. For an external development provider, configure its issuer, audience, JWKS URL, and public browser client. Register Authorization Code + PKCE (S256), the exact redirect URI `http://127.0.0.1:8000/prototype/`, and allow the local app origin at the provider token endpoint. Do not create a browser client secret.
+
+   For the included local Keycloak realm, set these values in `.env.backend`
+   and keep Keycloak and Flask bound to `127.0.0.1`:
+
+   ```dotenv
+   OIDC_ISSUER=http://127.0.0.1:8080/realms/deeplitics-local
+   OIDC_AUDIENCE=deeplitics-api
+   OIDC_JWKS_URL=http://127.0.0.1:8080/realms/deeplitics-local/protocol/openid-connect/certs
+   OIDC_CLIENT_ID=deeplitics-web
+   OIDC_AUTHORIZATION_ENDPOINT=http://127.0.0.1:8080/realms/deeplitics-local/protocol/openid-connect/auth
+   OIDC_TOKEN_ENDPOINT=http://127.0.0.1:8080/realms/deeplitics-local/protocol/openid-connect/token
+   OIDC_REDIRECT_URI=http://127.0.0.1:8000/prototype/
+   DEFAULT_TENANT_ID=11111111-1111-4111-8111-111111111111
+   STAGING_SIGNUP_ENABLED=true
+   STORIES_PATH=deploy/staging-stories.json
+   ```
+
+   Set `KEYCLOAK_HOME` to your local Keycloak installation, then import and
+   start the isolated realm:
+
+   ```sh
+   cp deploy/local-auth/realm.json "$KEYCLOAK_HOME/data/import/deeplitics-local-realm.json"
+   "$KEYCLOAK_HOME/bin/kc.sh" start-dev --http-host=127.0.0.1 --http-port=8080 --import-realm
+   ```
+
+   This realm permits registration only for local flow checks; it is not a
+   production identity provider. Never enable `STAGING_SIGNUP_ENABLED` with
+   customer data or outside the loopback-only development server. Load the
+   file into the shell without committing it:
 
    ```sh
    set -a
@@ -50,20 +89,25 @@ Requirements: Python 3.11 or newer, Docker Compose, and an OIDC development tena
    python3 -c 'import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())'
    ```
 
-   To run the same app in a local container, register the redirect URI
-   `http://127.0.0.1:8000/app/`, then run
-   `docker compose -f docker-compose.backend.yml --profile app up --build`.
-   Apply the schema with
-   `docker compose -f docker-compose.backend.yml --profile app run --rm backend flask --app backend.app db upgrade`.
-
-4. Apply the checked-in schema migration and start the local server:
+4. Apply the checked-in schema migration and start the local API and prototype:
 
    ```sh
    flask --app backend.app db upgrade
-   flask --app backend.app run --host 127.0.0.1
+   python3 deploy/build_vercel_staging.py
+   flask --app backend.app run --host 127.0.0.1 --port 8000
    ```
 
-5. Create a workspace and grant a verified OIDC identity access. Obtain `sub` from the identity provider’s trusted token/user inspection process; never use an email address as the subject identifier:
+   Open `http://127.0.0.1:8000/prototype/`. In the local realm, **Konto
+   erstellen** registers an identity at Keycloak and adds it to the synthetic
+   workspace; **Anmelden** uses the same OIDC provider and requires workspace
+   membership. No email address or password is sent to the Deeplitics API.
+   The Vercel static preview keeps auth disabled until a hosted OIDC provider,
+   API, and managed database are configured.
+
+5. With an external identity provider and self-sign-up disabled, create a
+   workspace and grant a verified OIDC identity access. Obtain `sub` from the
+   provider’s trusted token/user inspection process; never use an email
+   address as the subject identifier:
 
    ```sh
    flask --app backend.app provision-tenant --id 11111111-1111-4111-8111-111111111111 --name "Example workspace"
@@ -89,6 +133,7 @@ The API does not have an authentication bypass for local development. `/api/v1/h
 | `GET` | `/api/v1/health` | Public, minimal health response |
 | `GET` | `/api/v1/public-config` | Public browser OIDC settings; contains no secrets |
 | `GET` | `/api/v1/stories` | Public published story snapshot; short cache |
+| `POST` | `/api/v1/staging-signup` | Development only; loopback only; provisions a member in the synthetic local workspace |
 | `GET` | `/api/v1/me` | Authenticated tenant member |
 | `GET` | `/api/v1/me/preferences` | Authenticated member's encrypted settings |
 | `PUT` | `/api/v1/me/preferences` | Replace validated personal settings |

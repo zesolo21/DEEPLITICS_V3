@@ -263,6 +263,8 @@
     $("#workspace-label").textContent = signedIn ? state.workspace.name : "Öffentliche Übersicht";
     $("#signout-button").hidden = !signedIn;
     $("#clear-preferences").hidden = !signedIn;
+    $("#signup-button").hidden = signedIn || !state.config?.signup_enabled;
+    $("#signup-note").hidden = signedIn || !state.config?.signup_enabled;
     $("#tenant-id").value = currentTenant();
     $("#saved-open").title = signedIn ? "Gespeicherte Storys" : "Zum Speichern anmelden";
   }
@@ -336,9 +338,13 @@
     return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
 
-  async function startLogin(tenantId) {
+  async function startLogin(tenantId, createAccount = false) {
     if (!state.config?.auth_enabled) {
       $("#auth-message").textContent = "Die Anmeldung ist noch nicht konfiguriert. Öffentliche Storys bleiben verfügbar.";
+      return;
+    }
+    if (createAccount && !state.config.signup_enabled) {
+      $("#auth-message").textContent = "Die Kontoerstellung ist in dieser Umgebung deaktiviert.";
       return;
     }
     if (!validTenantId(tenantId)) {
@@ -349,7 +355,9 @@
     const verifier = base64Url(await randomToken(48));
     const stateValue = base64Url(await randomToken(32));
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-    sessionStorage.setItem(AUTH_TX_KEY, JSON.stringify({ state: stateValue, verifier, tenantId }));
+    sessionStorage.setItem(AUTH_TX_KEY, JSON.stringify({
+      state: stateValue, verifier, tenantId, intent: createAccount ? "signup" : "signin"
+    }));
 
     const oidc = state.config.oidc;
     const authorization = new URL(oidc.authorization_endpoint);
@@ -358,6 +366,7 @@
     authorization.searchParams.set("redirect_uri", oidc.redirect_uri);
     authorization.searchParams.set("scope", "openid");
     authorization.searchParams.set("state", stateValue);
+    if (createAccount) authorization.searchParams.set("prompt", "create");
     authorization.searchParams.set("code_challenge", base64Url(new Uint8Array(digest)));
     authorization.searchParams.set("code_challenge_method", "S256");
     if (oidc.audience) authorization.searchParams.set("audience", oidc.audience);
@@ -403,6 +412,10 @@
     }
     state.token = tokenResponse.access_token;
     try {
+      if (transaction.intent === "signup") {
+        if (!state.config.signup_enabled) throw new Error("Die Kontoerstellung ist in dieser Umgebung deaktiviert.");
+        await api("/api/v1/staging-signup", { method: "POST" });
+      }
       await loadMemberData();
     } catch (error) {
       state.token = null;
@@ -420,6 +433,17 @@
     ]);
     if (!configResponse.ok || !storyResponse.ok) throw new Error("Deeplitics konnte die Übersicht gerade nicht laden.");
     state.config = await configResponse.json();
+    try {
+      const redirect = new URL(state.config.oidc?.redirect_uri);
+      if (redirect.origin !== window.location.origin || redirect.pathname !== window.location.pathname ||
+          redirect.username || redirect.password || redirect.search || redirect.hash) {
+        state.config.auth_enabled = false;
+        state.config.signup_enabled = false;
+      }
+    } catch (_error) {
+      state.config.auth_enabled = false;
+      state.config.signup_enabled = false;
+    }
     const payload = await storyResponse.json();
     state.stories = Array.isArray(payload.stories) ? payload.stories : [];
     if (state.config.default_tenant_id && !sessionStorage.getItem(TENANT_KEY)) {
@@ -510,6 +534,14 @@
         return;
       }
       startLogin(tenantId).catch(error => { $("#auth-message").textContent = error.message; });
+    });
+    $("#signup-button").addEventListener("click", () => {
+      const tenantId = $("#tenant-id").value.trim();
+      if (!validTenantId(tenantId)) {
+        $("#auth-message").textContent = "Bitte gib eine gültige Workspace-ID ein.";
+        return;
+      }
+      startLogin(tenantId, true).catch(error => { $("#auth-message").textContent = error.message; });
     });
     $("#signout-button").addEventListener("click", signOut);
     $("#clear-preferences").addEventListener("click", clearPreferences);

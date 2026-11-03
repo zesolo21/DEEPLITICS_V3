@@ -68,7 +68,9 @@
         <label for="tenant-id">Workspace-ID</label>
         <input id="tenant-id" name="tenant-id" inputmode="text" autocomplete="off" placeholder="00000000-0000-4000-8000-000000000000" required>
         <button class="primary-button" type="submit">Weiter zur Anmeldung</button>
+        <button id="signup-button" class="text-button" type="button" hidden>Testkonto anlegen</button>
       </form>
+      <p id="signup-note" class="privacy-note" hidden>Nur im lokalen Testmodus: Das Testkonto erhält Zugang zur synthetischen Demo-Workspace.</p>
       <p id="auth-message" class="auth-message" role="status"></p>
       <p class="privacy-note">Deine gespeicherten Storys und Themenfilter bleiben verschlüsselt in deinem Workspace. Deeplitics speichert keine E-Mail-Adresse im Backend.</p>
       <button id="clear-preferences" class="text-button" type="button" hidden>Gespeicherte Einstellungen löschen</button>

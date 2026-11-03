@@ -1,12 +1,14 @@
-/* Deeplitics v7 — App-Logik. Reines Frontend, KEINE API-Aufrufe, KEIN
-   localStorage (Cowork-Artefakt-Vorgabe): Profil/Verlauf/Gespeichert
-   leben nur im Speicher dieser Sitzung und setzen sich beim Neuladen
-   zurueck (Nutzer wird darauf im Profil-Panel hingewiesen). */
+/* Deeplitics v7 — App-Logik. Story- und Profilansichten bleiben im Browser;
+   das Profil nutzt die API nur fuer OIDC-Anmeldung und Workspace-Zugriff.
+   Tokens bleiben im Speicher, die nicht angemeldeten Demo-Ansichten setzen
+   sich beim Neuladen zurueck. */
 (function () {
   "use strict";
 
   var STORIES = window.__STORIES__ || [];
   var SOURCE_BIAS = window.__SOURCE_BIAS__ || {};
+  var AUTH_TX_KEY = "deeplitics:oidc-transaction";
+  var AUTH_TENANT_KEY = "deeplitics:tenant";
 
   var CATEGORIES = {
     security:     { de: "Sicherheit & Militär",     en: "Security & Military" },
@@ -29,6 +31,15 @@
       wikipedia: "Wikipedia-Artikel öffnen", keyFigure: "Zentrale Figur dieser Story",
       profile: "Profil", newAvatar: "Neuer Avatar", language: "Sprache", appearance: "Darstellung",
       dark: "Dunkel", light: "Hell", contentPrefs: "Inhaltspräferenzen",
+      workspaceAccount: "Workspace-Konto", workspaceId: "Workspace-ID", signIn: "Anmelden",
+      signUp: "Konto erstellen", signOut: "Von Deeplitics abmelden", connectedTo: function (name) { return "Verbunden mit " + name; },
+      authLoading: "Anmeldedienst wird geprüft …", authNotConfigured: "Anmeldung ist in dieser Vorschau noch nicht eingerichtet.",
+      authInviteOnly: "Für ein Firmenkonto benötigst du eine Einladung vom Workspace-Admin.",
+      authSessionNote: "Dein Passwort bleibt beim Identitätsanbieter. Deeplitics erhält kein Passwort und speichert das Zugriffstoken nur im Arbeitsspeicher dieser Sitzung.",
+      authSignoutNote: "Das beendet die Deeplitics-Sitzung. Der Identitätsanbieter kann dich für spätere Anmeldungen angemeldet lassen.",
+      authConnected: "Du bist mit deinem Workspace verbunden.", authSignedOut: "Du wurdest von Deeplitics abgemeldet.",
+      authInvalidWorkspace: "Bitte gib eine gültige Workspace-ID ein.", authNotMember: "Du bist für diesen Workspace nicht freigeschaltet. Bitte wende dich an den Workspace-Admin.",
+      authFailed: "Die Anmeldung ist fehlgeschlagen. Bitte versuche es erneut.", authProviderCancelled: "Die Anmeldung wurde abgebrochen.",
       history: "Leseverlauf", saved: "Gespeichert", sessionNote: "Profil, Verlauf und gespeicherte Storys gelten nur für diese Sitzung und werden beim Neuladen zurückgesetzt.",
       emptyHistory: "Noch nichts gelesen. Öffne eine Story, und sie taucht hier auf.",
       emptySaved: "Noch nichts gespeichert. Tippe auf das Lesezeichen-Symbol einer Story.",
@@ -51,6 +62,15 @@
       wikipedia: "Open Wikipedia article", keyFigure: "Key figure in this story",
       profile: "Profile", newAvatar: "New avatar", language: "Language", appearance: "Appearance",
       dark: "Dark", light: "Light", contentPrefs: "Content preferences",
+      workspaceAccount: "Workspace account", workspaceId: "Workspace ID", signIn: "Sign in",
+      signUp: "Create account", signOut: "Sign out of Deeplitics", connectedTo: function (name) { return "Connected to " + name; },
+      authLoading: "Checking sign-in service …", authNotConfigured: "Sign-in is not configured for this preview yet.",
+      authInviteOnly: "A company account requires an invitation from a workspace admin.",
+      authSessionNote: "Your password stays with the identity provider. Deeplitics never receives it and keeps the access token only in this session's memory.",
+      authSignoutNote: "This ends the Deeplitics session. The identity provider may keep you signed in for later visits.",
+      authConnected: "You are connected to your workspace.", authSignedOut: "You are signed out of Deeplitics.",
+      authInvalidWorkspace: "Enter a valid workspace ID.", authNotMember: "You are not enabled for this workspace. Contact its admin.",
+      authFailed: "Sign-in failed. Please try again.", authProviderCancelled: "Sign-in was cancelled.",
       history: "Reading history", saved: "Saved", sessionNote: "Profile, history and saved stories only last for this session and reset on reload.",
       emptyHistory: "Nothing read yet. Open a story and it will show up here.",
       emptySaved: "Nothing saved yet. Tap a story's bookmark icon.",
@@ -80,7 +100,17 @@
     // der Spruch bei jedem Klick neu getippt werden.
     greetingText: null,
     greetingTyped: false,
-    introGridPlayed: false
+    introGridPlayed: false,
+    auth: {
+      loaded: false,
+      config: null,
+      token: null,
+      tenantId: "",
+      workspace: null,
+      role: null,
+      message: "",
+      busy: false
+    }
   };
 
   function t(key) { return STR[state.lang][key]; }
@@ -108,6 +138,242 @@
     return String(s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
+  }
+
+  function validTenantId(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || "");
+  }
+
+  function authTenantId() {
+    if (state.auth.tenantId) return state.auth.tenantId;
+    try {
+      var saved = sessionStorage.getItem(AUTH_TENANT_KEY);
+      if (saved && validTenantId(saved)) return saved;
+    } catch (e) {}
+    var defaultTenant = state.auth.config && state.auth.config.default_tenant_id;
+    return validTenantId(defaultTenant) ? defaultTenant : "";
+  }
+
+  function isLoopbackHost(hostname) {
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  }
+
+  function safeIdentityEndpoint(raw) {
+    var endpoint = new URL(raw);
+    var secure = endpoint.protocol === "https:";
+    var localHttp = endpoint.protocol === "http:" &&
+      isLoopbackHost(window.location.hostname) && isLoopbackHost(endpoint.hostname);
+    if ((!secure && !localHttp) || endpoint.username || endpoint.password || endpoint.hash) {
+      throw new Error("unsafe-identity-endpoint");
+    }
+    return endpoint;
+  }
+
+  function identitySettings() {
+    var oidc = state.auth.config && state.auth.config.oidc;
+    if (!oidc || !oidc.client_id || !oidc.authorization_endpoint || !oidc.token_endpoint || !oidc.redirect_uri) {
+      throw new Error("identity-not-configured");
+    }
+    var authorizationEndpoint = safeIdentityEndpoint(oidc.authorization_endpoint);
+    var tokenEndpoint = safeIdentityEndpoint(oidc.token_endpoint);
+    var redirect = new URL(oidc.redirect_uri);
+    if (redirect.origin !== window.location.origin || redirect.pathname !== window.location.pathname ||
+        redirect.username || redirect.password || redirect.search || redirect.hash) {
+      throw new Error("unsafe-redirect-uri");
+    }
+    return { oidc: oidc, authorizationEndpoint: authorizationEndpoint, tokenEndpoint: tokenEndpoint, redirect: redirect };
+  }
+
+  async function loadAuthConfig() {
+    try {
+      var response = await fetch("/api/v1/public-config", {
+        cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer"
+      });
+      if (!response.ok) throw new Error("public-config-unavailable");
+      var config = await response.json();
+      state.auth.config = {
+        auth_enabled: config.auth_enabled === true && !!config.oidc,
+        signup_enabled: config.signup_enabled === true,
+        default_tenant_id: validTenantId(config.default_tenant_id) ? config.default_tenant_id : "",
+        oidc: config.oidc || null
+      };
+      state.auth.tenantId = authTenantId();
+      var invitedTenant = new URLSearchParams(window.location.search).get("tenant");
+      if (validTenantId(invitedTenant)) state.auth.tenantId = invitedTenant;
+    } catch (e) {
+      state.auth.config = { auth_enabled: false, signup_enabled: false, default_tenant_id: "", oidc: null };
+    }
+    state.auth.loaded = true;
+    if (typeof profileOpen !== "undefined" && profileOpen) renderProfilePanel();
+  }
+
+  async function authApi(path, method) {
+    if (!state.auth.token || !state.auth.tenantId) throw new Error("authentication-required");
+    var response = await fetch(path, {
+      method: method || "GET",
+      headers: {
+        "Authorization": "Bearer " + state.auth.token,
+        "X-Tenant-ID": state.auth.tenantId
+      },
+      cache: "no-store",
+      credentials: "omit",
+      referrerPolicy: "no-referrer"
+    });
+    var payload = null;
+    if (response.status !== 204) {
+      try { payload = await response.json(); } catch (e) { payload = null; }
+    }
+    if (!response.ok) {
+      var error = new Error("request-failed");
+      error.status = response.status;
+      throw error;
+    }
+    return payload;
+  }
+
+  async function randomBytes(count) {
+    return crypto.getRandomValues(new Uint8Array(count));
+  }
+
+  function base64Url(bytes) {
+    var binary = "";
+    for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+
+  async function startProfileAuth(createAccount) {
+    var config = state.auth.config;
+    if (!config || !config.auth_enabled) {
+      state.auth.message = t("authNotConfigured");
+      renderProfilePanel();
+      return;
+    }
+    if (createAccount && !config.signup_enabled) {
+      state.auth.message = t("authInviteOnly");
+      renderProfilePanel();
+      return;
+    }
+
+    var tenantInput = document.getElementById("authWorkspaceId");
+    var tenantId = tenantInput ? tenantInput.value.trim() : authTenantId();
+    state.auth.tenantId = tenantId;
+    if (!validTenantId(tenantId)) {
+      state.auth.message = t("authInvalidWorkspace");
+      renderProfilePanel();
+      return;
+    }
+
+    state.auth.busy = true;
+    state.auth.message = t("authLoading");
+    renderProfilePanel();
+    try {
+      var settings = identitySettings();
+      var verifier = base64Url(await randomBytes(48));
+      var transactionState = base64Url(await randomBytes(32));
+      var digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+      var transaction = {
+        state: transactionState,
+        verifier: verifier,
+        tenantId: tenantId,
+        intent: createAccount ? "signup" : "signin"
+      };
+      sessionStorage.setItem(AUTH_TX_KEY, JSON.stringify(transaction));
+      sessionStorage.setItem(AUTH_TENANT_KEY, tenantId);
+
+      var authorization = new URL(settings.authorizationEndpoint.href);
+      authorization.searchParams.set("response_type", "code");
+      authorization.searchParams.set("client_id", settings.oidc.client_id);
+      authorization.searchParams.set("redirect_uri", settings.redirect.href);
+      authorization.searchParams.set("scope", "openid");
+      authorization.searchParams.set("state", transactionState);
+      authorization.searchParams.set("code_challenge", base64Url(new Uint8Array(digest)));
+      authorization.searchParams.set("code_challenge_method", "S256");
+      if (settings.oidc.audience) authorization.searchParams.set("audience", settings.oidc.audience);
+      if (createAccount) authorization.searchParams.set("prompt", "create");
+      window.location.assign(authorization.href);
+    } catch (error) {
+      state.auth.busy = false;
+      state.auth.message = t("authFailed");
+      renderProfilePanel();
+    }
+  }
+
+  async function completeProfileAuth() {
+    var url = new URL(window.location.href);
+    var code = url.searchParams.get("code");
+    var returnedState = url.searchParams.get("state");
+    var providerError = url.searchParams.get("error");
+    if (!code && !providerError) return false;
+
+    var transactionText = null;
+    try {
+      transactionText = sessionStorage.getItem(AUTH_TX_KEY);
+      sessionStorage.removeItem(AUTH_TX_KEY);
+    } catch (e) {}
+    ["code", "state", "error", "error_description", "session_state", "iss"].forEach(function (key) {
+      url.searchParams.delete(key);
+    });
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+
+    if (providerError) {
+      state.auth.message = t("authProviderCancelled");
+      return true;
+    }
+    var transaction;
+    try { transaction = JSON.parse(transactionText || "null"); } catch (e) { transaction = null; }
+    if (!transaction || !returnedState || transaction.state !== returnedState || !transaction.verifier ||
+        !validTenantId(transaction.tenantId) || !["signin", "signup"].includes(transaction.intent)) {
+      state.auth.message = t("authFailed");
+      return true;
+    }
+
+    try {
+      if (!state.auth.config || !state.auth.config.auth_enabled) throw new Error("identity-not-configured");
+      if (transaction.intent === "signup" && !state.auth.config.signup_enabled) throw new Error("signup-disabled");
+      var settings = identitySettings();
+      var body = new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: settings.oidc.client_id,
+        code: code,
+        redirect_uri: settings.redirect.href,
+        code_verifier: transaction.verifier
+      });
+      var response = await fetch(settings.tokenEndpoint.href, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body,
+        cache: "no-store",
+        credentials: "omit",
+        referrerPolicy: "no-referrer"
+      });
+      if (!response.ok) throw new Error("token-exchange-failed");
+      var tokenResponse = await response.json();
+      if (typeof tokenResponse.access_token !== "string" || typeof tokenResponse.token_type !== "string" ||
+          tokenResponse.token_type.toLowerCase() !== "bearer") throw new Error("invalid-token-response");
+
+      state.auth.token = tokenResponse.access_token;
+      state.auth.tenantId = transaction.tenantId;
+      if (transaction.intent === "signup") await authApi("/api/v1/staging-signup", "POST");
+      var member = await authApi("/api/v1/me", "GET");
+      state.auth.workspace = member.workspace;
+      state.auth.role = member.user && member.user.role;
+      state.auth.message = t("authConnected");
+    } catch (error) {
+      state.auth.token = null;
+      state.auth.workspace = null;
+      state.auth.role = null;
+      state.auth.message = error && error.status === 403 ? t("authNotMember") : t("authFailed");
+    }
+    return true;
+  }
+
+  function signOutOfDeeplitics() {
+    state.auth.token = null;
+    state.auth.workspace = null;
+    state.auth.role = null;
+    state.auth.message = t("authSignedOut");
+    try { sessionStorage.removeItem(AUTH_TX_KEY); } catch (e) {}
+    renderProfilePanel();
   }
 
   function linkify(text, story) {
@@ -905,10 +1171,41 @@
   }
 
   /* ---------------- profile panel ---------------- */
+  function profileAuthSectionHtml() {
+    var auth = state.auth;
+    var config = auth.config || {};
+    var connected = !!(auth.token && auth.workspace);
+    var status = auth.message;
+    if (!status && !auth.loaded) status = t("authLoading");
+    else if (!status && !config.auth_enabled) status = t("authNotConfigured");
+    else if (!status && !config.signup_enabled) status = t("authInviteOnly");
+
+    if (connected) {
+      return '<div class="profile-section"><div class="profile-label">' + t("workspaceAccount") + '</div>' +
+        '<div class="auth-connected">' + escapeHtml(t("connectedTo")(auth.workspace.name || "Workspace")) + '</div>' +
+        '<button class="auth-action" id="btnAuthSignOut" type="button">' + t("signOut") + '</button>' +
+        '<p class="profile-auth-message" role="status">' + escapeHtml(status || t("authConnected")) + '</p>' +
+        '<p class="auth-note">' + t("authSignoutNote") + '</p></div>';
+    }
+
+    var disabled = !auth.loaded || !config.auth_enabled || auth.busy;
+    var signupDisabled = disabled || !config.signup_enabled;
+    return '<div class="profile-section"><div class="profile-label">' + t("workspaceAccount") + '</div>' +
+      '<label class="auth-label" for="authWorkspaceId">' + t("workspaceId") + '</label>' +
+      '<input class="auth-workspace-input" id="authWorkspaceId" type="text" inputmode="text" autocomplete="off" maxlength="36" value="' + escapeHtml(authTenantId()) + '" aria-describedby="authMessage">' +
+      '<div class="auth-actions">' +
+        '<button class="auth-action" id="btnAuthSignIn" type="button"' + (disabled ? ' disabled' : '') + '>' + t("signIn") + '</button>' +
+        '<button class="auth-action secondary" id="btnAuthSignUp" type="button"' + (signupDisabled ? ' disabled' : '') + '>' + t("signUp") + '</button>' +
+      '</div>' +
+      '<p class="profile-auth-message" id="authMessage" role="status">' + escapeHtml(status || "") + '</p>' +
+      '<p class="auth-note">' + t("authSessionNote") + '</p></div>';
+  }
+
   function renderProfilePanel() {
     var panel = document.getElementById("profilePanel");
     var html = '<div class="profile-head"><div class="profile-avatar-lg">' + avatarSVG(state.avatarSeed, 48) + '</div>' +
       '<div><div class="profile-name">' + t("profile") + '</div><button class="profile-shuffle" id="btnShuffleAvatar">' + t("newAvatar") + '</button></div></div>' +
+      profileAuthSectionHtml() +
       '<div class="profile-section"><div class="profile-label">' + t("language") + '</div>' +
       '<div class="seg-control"><button class="seg-btn' + (state.lang==="de"?" active":"") + '" data-lang="de">Deutsch</button>' +
       '<button class="seg-btn' + (state.lang==="en"?" active":"") + '" data-lang="en">English</button></div>' +
@@ -944,6 +1241,14 @@
     });
     document.getElementById("btnGoHistory").onclick = function () { closeProfile(); openList("history"); };
     document.getElementById("btnGoSaved").onclick = function () { closeProfile(); openList("saved"); };
+    var tenantInput = document.getElementById("authWorkspaceId");
+    if (tenantInput) tenantInput.oninput = function () { state.auth.tenantId = tenantInput.value.trim(); };
+    var signInButton = document.getElementById("btnAuthSignIn");
+    if (signInButton) signInButton.onclick = function () { startProfileAuth(false); };
+    var signUpButton = document.getElementById("btnAuthSignUp");
+    if (signUpButton) signUpButton.onclick = function () { startProfileAuth(true); };
+    var signOutButton = document.getElementById("btnAuthSignOut");
+    if (signOutButton) signOutButton.onclick = signOutOfDeeplitics;
   }
 
   function updateAvatarButtons() {
@@ -1019,6 +1324,17 @@
     el.textContent = t("standLabel")(label);
   }
 
+  async function initializeAuth() {
+    await loadAuthConfig();
+    var handledCallback = await completeProfileAuth();
+    if (handledCallback) {
+      profileOpen = true;
+      document.getElementById("profilePanel").classList.add("open");
+      document.getElementById("profileScrim").classList.add("open");
+      renderProfilePanel();
+    }
+  }
+
   function init() {
     document.documentElement.setAttribute("data-theme", state.theme);
     updateAvatarButtons();
@@ -1028,6 +1344,7 @@
     document.getElementById("entityScrim").onclick = closeEntityModal;
     renderLastUpdated();
     renderHome();
+    initializeAuth();
     window.addEventListener("resize", syncTabHeight);
   }
 
