@@ -1,5 +1,5 @@
 {
-  "realm": "deeplitics-local",
+  "realm": "deeplitics-local-v2",
   "enabled": true,
   "displayName": "Deeplitics Local Test",
   "registrationAllowed": true,
@@ -30,7 +30,7 @@
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "deeplitics-api",
+            "included.custom.audience": "deeplitics-api",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }

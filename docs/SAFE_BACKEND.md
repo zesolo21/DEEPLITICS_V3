@@ -52,12 +52,12 @@ use that exact URI.
    and keep Keycloak and Flask bound to `127.0.0.1`:
 
    ```dotenv
-   OIDC_ISSUER=http://127.0.0.1:8080/realms/deeplitics-local
+   OIDC_ISSUER=http://127.0.0.1:8080/realms/deeplitics-local-v2
    OIDC_AUDIENCE=deeplitics-api
-   OIDC_JWKS_URL=http://127.0.0.1:8080/realms/deeplitics-local/protocol/openid-connect/certs
+   OIDC_JWKS_URL=http://127.0.0.1:8080/realms/deeplitics-local-v2/protocol/openid-connect/certs
    OIDC_CLIENT_ID=deeplitics-web
-   OIDC_AUTHORIZATION_ENDPOINT=http://127.0.0.1:8080/realms/deeplitics-local/protocol/openid-connect/auth
-   OIDC_TOKEN_ENDPOINT=http://127.0.0.1:8080/realms/deeplitics-local/protocol/openid-connect/token
+   OIDC_AUTHORIZATION_ENDPOINT=http://127.0.0.1:8080/realms/deeplitics-local-v2/protocol/openid-connect/auth
+   OIDC_TOKEN_ENDPOINT=http://127.0.0.1:8080/realms/deeplitics-local-v2/protocol/openid-connect/token
    OIDC_REDIRECT_URI=http://127.0.0.1:8000/prototype/
    DEFAULT_TENANT_ID=11111111-1111-4111-8111-111111111111
    STAGING_SIGNUP_ENABLED=true
@@ -68,7 +68,7 @@ use that exact URI.
    start the isolated realm:
 
    ```sh
-   cp deploy/local-auth/realm.json "$KEYCLOAK_HOME/data/import/deeplitics-local-realm.json"
+   cp deploy/local-auth/realm.json "$KEYCLOAK_HOME/data/import/deeplitics-local-v2-realm.json"
    "$KEYCLOAK_HOME/bin/kc.sh" start-dev --http-host=127.0.0.1 --http-port=8080 --import-realm
    ```
 
