@@ -1,6 +1,13 @@
 {
-  "cleanUrls": true,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "python3 deploy/build_vercel_staging.py",
+  "outputDirectory": "public",
+  "cleanUrls": false,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/frontend/index.html" }
+    { "source": "/", "destination": "/app/index.html" },
+    { "source": "/app", "destination": "/app/index.html" },
+    { "source": "/api/v1/public-config", "destination": "/api/v1/public-config.json" },
+    { "source": "/api/v1/stories", "destination": "/api/v1/stories.json" }
   ]
 }

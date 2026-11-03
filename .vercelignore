@@ -1,0 +1,14 @@
+.git/
+.github/
+backend/
+data/
+docs/
+frontend/
+path/
+pipeline/
+v2/
+Dockerfile.backend
+docker-compose.backend.yml
+requirements.txt
+wsgi.py
+.env.backend.example

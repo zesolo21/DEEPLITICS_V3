@@ -1,0 +1,5 @@
+{
+  "auth_enabled": false,
+  "default_tenant_id": null,
+  "environment": "staging"
+}

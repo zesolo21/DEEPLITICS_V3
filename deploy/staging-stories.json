@@ -1,0 +1,40 @@
+{
+  "stories": [
+    {
+      "id": "demo-energy-01",
+      "title": "Demo: Lunara testet ein gemeinschaftliches Stromnetz",
+      "theme_category": "trade",
+      "one_line": "In der fiktiven Region Lunara erproben drei Gemeinden ein Modell, das Solarstrom zwischen öffentlichen Gebäuden teilt.",
+      "summary": [
+        "Die erfundene Initiative verbindet drei kommunale Solarparks mit Schulen und einem Krankenhaus.",
+        "Ein sechsmonatiger Test soll zeigen, wie Kosten und Versorgung zwischen den Gemeinden verteilt werden können.",
+        "Der Pilot ist ein vollständig synthetisches Beispiel und beschreibt kein reales Ereignis."
+      ],
+      "deep_dive": "Das Beispiel zeigt, welche Fragen ein lokales Energienetz aufwirft: Wer finanziert Speicher, wie wird knappe Energie verteilt und wer trägt die Verantwortung bei Ausfällen? Alle Orte und Vorgänge in dieser Demo sind erfunden.",
+      "historical_threads": [],
+      "entities": [],
+      "quotes": [],
+      "article_urls": [],
+      "primary_sources": [],
+      "generated_at": "2026-11-03T00:00:00Z"
+    },
+    {
+      "id": "demo-harbor-02",
+      "title": "Demo: Hafenrat von Meridia plant einen neuen Güterkorridor",
+      "theme_category": "diplomacy",
+      "one_line": "Die fiktive Küstenstadt Meridia vergleicht zwei Routen für einen neuen Güterkorridor und lädt Nachbargemeinden zu Gesprächen ein.",
+      "summary": [
+        "Ein erfundener Hafenrat prüft eine Bahnverbindung und eine alternative Straßenroute.",
+        "Die Gespräche drehen sich um Lärm, Kosten und Zugang für kleinere Betriebe.",
+        "Das Szenario ist ausschließlich für die synthetische Staging-Vorschau geschrieben."
+      ],
+      "deep_dive": "Ein Infrastrukturprojekt kann Handel erleichtern und zugleich lokale Belastungen verschieben. In diesem erfundenen Beispiel hängt die Entscheidung davon ab, wie die Gemeinden Nutzen, Kosten und Mitbestimmung gewichten.",
+      "historical_threads": [],
+      "entities": [],
+      "quotes": [],
+      "article_urls": [],
+      "primary_sources": [],
+      "generated_at": "2026-11-03T00:00:00Z"
+    }
+  ]
+}
