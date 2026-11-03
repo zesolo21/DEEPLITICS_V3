@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen – Deeplitics{% endblock %}
+{% block content %}
+<h1>Einstellungen</h1>
+<p style="margin-top:0;">Ein einziges, fest hinterlegtes Profil in dieser Version – kein Login nötig.</p>
+
+<div class="setting-block">
+  <h2>Gepinnte Themen</h2>
+  <p class="setting-note">Bestimmt, welche Themenblöcke auf dem Dashboard erscheinen – die „Das Wichtigste“-Kachel ist davon unabhängig und immer sichtbar.</p>
+  {% for t in topics %}
+    <form class="chip-form" method="post" action="{{ url_for('toggle_pin') }}">
+      <input type="hidden" name="topic_key" value="{{ t.key }}">
+      <button type="submit" class="chip-toggle {{ 'active' if t.pinned else '' }}">{{ t.label }}</button>
+    </form>
+  {% endfor %}
+</div>
+
+<form method="post" action="{{ url_for('update_sliders') }}">
+  <div class="setting-block">
+    <h2>Detailtiefe</h2>
+    <p class="setting-note">Steuert nur die Darstellung (wie viel Text angezeigt wird), nicht welche Threads dir angezeigt werden.</p>
+    <div class="radio-row">
+      <label class="radio-label"><input type="radio" name="detail_level" value="short" {{ "checked" if user.detail_level=="short" }}> Kurz</label>
+      <label class="radio-label"><input type="radio" name="detail_level" value="medium" {{ "checked" if user.detail_level=="medium" }}> Mittel</label>
+      <label class="radio-label"><input type="radio" name="detail_level" value="full" {{ "checked" if user.detail_level=="full" }}> Vollständig</label>
+    </div>
+  </div>
+
+  <div class="setting-block">
+    <h2>Perspektivenbreite</h2>
+    <p class="setting-note">Bei „eng“ wird eine Quelle mit abweichender Perspektive nur eingeklappt angezeigt, nie entfernt.</p>
+    <div class="radio-row">
+      <label class="radio-label"><input type="radio" name="perspective_breadth" value="narrow" {{ "checked" if user.perspective_breadth=="narrow" }}> Eng</label>
+      <label class="radio-label"><input type="radio" name="perspective_breadth" value="wide" {{ "checked" if user.perspective_breadth=="wide" }}> Breit</label>
+    </div>
+  </div>
+
+  <button type="submit" class="pill-btn">Speichern</button>
+</form>
+{% endblock %}

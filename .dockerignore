@@ -1,0 +1,9 @@
+.git
+.venv
+__pycache__
+*.py[cod]
+.env
+.env.*
+v2/*.db
+data/live_api_test_*/
+data/scale_batch_*/

@@ -1,0 +1,25 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /srv/deeplitics
+
+RUN addgroup --system --gid 10001 deeplitics \
+    && adduser --system --uid 10001 --ingroup deeplitics --no-create-home deeplitics
+
+COPY backend/requirements.txt /srv/deeplitics/backend/requirements.txt
+RUN pip install --no-cache-dir -r /srv/deeplitics/backend/requirements.txt
+
+COPY backend /srv/deeplitics/backend
+COPY data/stories.json /srv/deeplitics/data/stories.json
+COPY v3 /srv/deeplitics/v3
+COPY wsgi.py /srv/deeplitics/wsgi.py
+
+USER 10001:10001
+EXPOSE 8000
+
+# Keep access logs disabled: the OIDC callback briefly carries an authorization
+# code in its query string. Route errors still go to stderr for the collector.
+CMD ["gunicorn", "--bind=0.0.0.0:8000", "--workers=2", "--threads=2", "--timeout=45", "--error-logfile=-", "wsgi:app"]

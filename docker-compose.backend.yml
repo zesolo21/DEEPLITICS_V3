@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: deeplitics
+      POSTGRES_USER: deeplitics
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-only-password}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - deeplitics_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deeplitics -d deeplitics"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    profiles: ["app"]
+    env_file:
+      - path: .env.backend
+        required: false
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://deeplitics:${POSTGRES_PASSWORD:-local-only-password}@postgres:5432/deeplitics
+      OIDC_REDIRECT_URI: http://127.0.0.1:8000/app/
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  deeplitics_pgdata:

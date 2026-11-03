@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – Deeplitics{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<p style="margin-top:0;">Stand: {{ today }}</p>
+
+<div class="top-tile">
+  <div class="eyebrow">Das Wichtigste</div>
+  <p class="top-tile-note">Immer sichtbar, unabhängig von deinen gepinnten Themen – damit du nichts Großes verpasst.</p>
+  {% if top_feed %}
+    {% for th in top_feed %}
+      <a class="thread-row" href="{{ url_for('thread_detail', thread_id=th.id) }}">
+        <div class="thread-row-top">
+          <span class="topic-chip">{{ th.topic }}</span>
+          <span class="score-note">Score {{ "%.2f"|format(th.importance_score) }}</span>
+        </div>
+        <div class="thread-title">{{ th.title }}</div>
+        <p class="thread-fact">{{ th.fact_core[:140] }}{% if th.fact_core|length > 140 %}…{% endif %}</p>
+      </a>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">Noch keine Threads vorhanden. Zuerst die Pipeline laufen lassen.</div>
+  {% endif %}
+</div>
+
+<h2>Deine gepinnten Themen</h2>
+{% if pinned %}
+  <div class="topic-grid">
+    {% for p in pinned %}
+      <a class="topic-tile" href="{{ url_for('topic_view', topic_key=p.key) }}">
+        {% if p.new_count > 0 %}<span class="new-badge">{{ p.new_count }} neu</span>{% endif %}
+        <div class="topic-tile-label">{{ p.label }}</div>
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty-state">Noch keine Themen gepinnt. <a class="nav-link" href="{{ url_for('settings') }}">In den Einstellungen anpinnen.</a></div>
+{% endif %}
+{% endblock %}

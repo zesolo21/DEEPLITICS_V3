@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.backend.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+instance/

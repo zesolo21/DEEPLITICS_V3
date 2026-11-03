@@ -1,0 +1,55 @@
+name: Deeplitics – Storys aktualisieren
+
+# Laeuft NUR noch manuell per Klick (workflow_dispatch) -- bewusst kein
+# automatischer Zeitplan mehr, damit jeder API-Aufruf (= Kosten) nur nach
+# bewusstem Trigger passiert, nicht mehr automatisch alle 6 Stunden.
+on:
+  workflow_dispatch:
+    inputs:
+      max_stories:
+        description: "Max. Anzahl Storys (fuer guenstige Tests z.B. 1 statt 12 -- weniger API-Calls, weniger Kosten)"
+        required: false
+        default: "12"
+
+# Der Workflow committet die aktualisierte data/stories.json + neu gebaute
+# frontend/index.html zurueck ins Repo -- braucht Schreibrechte.
+permissions:
+  contents: write
+
+concurrency:
+  group: update-stories-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repo auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Abhaengigkeiten installieren
+        run: pip install -r requirements.txt
+
+      - name: Pipeline laufen lassen (RSS -> Cluster -> LLM-Synthese -> stories.json)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MAX_STORIES: ${{ github.event.inputs.max_stories || '12' }}
+        run: |
+          python3 -c 'import os, sys; value = os.environ["MAX_STORIES"]; sys.exit(0 if value.isdecimal() and 1 <= int(value) <= 12 else "max_stories must be an integer from 1 to 12")'
+          python3 pipeline/run_pipeline.py --profile default --max-stories "$MAX_STORIES"
+
+      - name: Statisches Frontend neu bauen
+        run: python3 pipeline/build_frontend.py
+
+      - name: Aenderungen committen, falls vorhanden
+        run: |
+          git config user.name "deeplitics-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/stories.json frontend/index.html
+          git diff --cached --quiet && echo "Keine Aenderungen." || git commit -m "Automatisches Story-Update ($(date -u +%Y-%m-%dT%H:%MZ))"
+          git push

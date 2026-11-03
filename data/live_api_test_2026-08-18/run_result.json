@@ -1,0 +1,15 @@
+{
+  "elapsed_seconds": 379.71565866470337,
+  "total_input_tokens": 6682,
+  "total_output_tokens": 16574,
+  "estimated_cost_usd": 0.26865599999999995,
+  "stories_ok": [
+    "eu-21st-russia-sanctions-2026-08",
+    "gaza-roadmap-netanyahu-standoff-2026-08"
+  ],
+  "errors": {
+    "venezuela-maduro-aftermath-2026-08": "RuntimeError: Anthropic API Fehler 400: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CeAYTaEHMkq396dxC9mmw\"}",
+    "taiwan-china-drills-2026-08": "RuntimeError: Anthropic API Fehler 400: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CeAYTJoqRJWEuRqVdC4QL\"}",
+    "uk-starmer-leadership-pressure-2026-08": "RuntimeError: Anthropic API Fehler 400: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CeAYSX9xNZvqA773Y4Q8e\"}"
+  }
+}

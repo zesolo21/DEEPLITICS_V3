@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ thread.title }} – Deeplitics{% endblock %}
+{% block content %}
+<a class="pill-btn back-link" href="{{ url_for('topic_view', topic_key=thread.topic) }}">← {{ topic_label }}</a>
+
+<div class="eyebrow">{{ topic_label }} · Score {{ "%.2f"|format(thread.importance_score) }} · {{ thread.n_independent_sources }} unabhängige Quelle{{ "n" if thread.n_independent_sources != 1 else "" }}</div>
+<h1>{{ thread.title }}</h1>
+
+<p class="fact-core">{{ thread.fact_core }}</p>
+
+{% if detail_level != "short" %}
+<h2>Zeitleiste</h2>
+<ul class="timeline">
+  {% for entry in thread.timeline %}
+    <li>
+      <div class="tl-date">{{ entry.date }}</div>
+      <div class="tl-desc">{{ entry.description }}</div>
+    </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if thread.actors %}
+<h2>Beteiligte Akteure</h2>
+<div class="actor-row">
+  {% for actor in thread.actors %}<span class="actor-chip">{{ actor }}</span>{% endfor %}
+</div>
+{% endif %}
+
+<h2>Quellen</h2>
+{% for sv in source_views %}
+  <details class="source-card" {{ "" if sv.collapsed else "open" }}>
+    <summary class="source-card-top">
+      <span class="source-name">{{ sv.article.source }}</span>
+      {% if sv.article.is_opinion %}<span class="opinion-chip">Meinung</span>{% endif %}
+      {% if sv.article.source_dissenting %}<span class="dissent-chip">Abweichende Perspektive</span>{% endif %}
+    </summary>
+    {% if sv.collapsed %}
+      <p class="collapsed-note">Eingeklappt, weil deine Perspektivenbreite auf „eng“ steht (Einstellungen). Zum Aufklappen anklicken – die Quelle wird nie entfernt.</p>
+    {% endif %}
+    <div class="source-body">
+      <strong>{{ sv.article.title }}</strong>
+      <p>{{ sv.article.text }}</p>
+      <p><em>{{ sv.article.published_at }}</em> · <a href="{{ sv.article.url }}" target="_blank" rel="noopener">Artikel öffnen</a></p>
+    </div>
+  </details>
+{% endfor %}
+{% endblock %}

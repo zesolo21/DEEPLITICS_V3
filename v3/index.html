@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#171613">
+  <title>Deeplitics — Zusammenhänge verstehen</title>
+  <link rel="stylesheet" href="/app/styles.css">
+  <script src="/app/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/app/" aria-label="Deeplitics Startseite">
+      <span class="brand-mark" aria-hidden="true">D</span>
+      <span>deeplitics</span>
+    </a>
+    <div class="top-actions">
+      <span id="workspace-label" class="workspace-label">Öffentliche Übersicht</span>
+      <button id="saved-open" class="quiet-button" type="button" aria-label="Gespeicherte Storys öffnen">
+        <span aria-hidden="true">▱</span><span class="saved-count" id="saved-count">0</span>
+      </button>
+      <button id="account-open" class="account-button" type="button">Anmelden</button>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">Nachrichten. Zusammenhänge. Kontext.</p>
+      <h1 id="page-title">Die große Geschichte hinter den Meldungen.</h1>
+      <p class="intro-copy">Deeplitics verbindet aktuelle Ereignisse mit den politischen und historischen Linien, die sie geprägt haben.</p>
+      <div class="feed-meta"><span class="live-dot" aria-hidden="true"></span><span id="feed-updated">Aktuelle Übersicht</span><span id="story-total"></span></div>
+    </section>
+
+    <section class="controls" aria-label="Storys filtern">
+      <label class="search-box">
+        <span aria-hidden="true">⌕</span>
+        <span class="sr-only">Storys durchsuchen</span>
+        <input id="search" type="search" placeholder="Themen, Länder oder Akteure suchen" autocomplete="off">
+        <kbd>/</kbd>
+      </label>
+      <nav id="topic-filters" class="topic-filters" aria-label="Themenfilter"></nav>
+    </section>
+
+    <section id="story-list" class="story-grid" aria-label="Aktuelle Storys" aria-live="polite">
+      <div class="loading-card"><span class="spinner" aria-hidden="true"></span><span>Storys werden geladen …</span></div>
+    </section>
+    <p id="empty-state" class="empty-state" hidden>Keine Storys passen zu dieser Auswahl.</p>
+  </main>
+
+  <footer class="site-footer">
+    <span>Deeplitics · Kontext statt Schlagzeilen</span>
+    <span>Storys sind redaktionelle Zusammenfassungen mit verlinkten Quellen.</span>
+  </footer>
+
+  <dialog id="story-dialog" class="story-dialog" aria-labelledby="detail-title">
+    <button class="dialog-close" data-close="story-dialog" type="button" aria-label="Story schließen">×</button>
+    <article id="story-detail" class="story-detail"></article>
+  </dialog>
+
+  <dialog id="auth-dialog" class="auth-dialog" aria-labelledby="auth-title">
+    <button class="dialog-close" data-close="auth-dialog" type="button" aria-label="Dialog schließen">×</button>
+    <div class="auth-inner">
+      <p class="eyebrow">Dein Deeplitics</p>
+      <h2 id="auth-title">Mit deinem Workspace verbinden</h2>
+      <p id="auth-copy" class="auth-copy">Melde dich sicher bei deinem Unternehmen an, um Storys zu speichern. Dein Zugriff wird vom Workspace verwaltet.</p>
+      <form id="tenant-form" class="tenant-form">
+        <label for="tenant-id">Workspace-ID</label>
+        <input id="tenant-id" name="tenant-id" inputmode="text" autocomplete="off" placeholder="00000000-0000-4000-8000-000000000000" required>
+        <button class="primary-button" type="submit">Weiter zur Anmeldung</button>
+      </form>
+      <p id="auth-message" class="auth-message" role="status"></p>
+      <p class="privacy-note">Deine gespeicherten Storys und Themenfilter bleiben verschlüsselt in deinem Workspace. Deeplitics speichert keine E-Mail-Adresse im Backend.</p>
+      <button id="clear-preferences" class="text-button" type="button" hidden>Gespeicherte Einstellungen löschen</button>
+      <button id="signout-button" class="text-button" type="button" hidden>Auf diesem Gerät abmelden</button>
+    </div>
+  </dialog>
+
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

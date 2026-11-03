@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ topic_label }} – Deeplitics{% endblock %}
+{% block content %}
+<a class="pill-btn back-link" href="{{ url_for('dashboard') }}">← Dashboard</a>
+<h1>{{ topic_label }}</h1>
+<p style="margin-top:0;">Sortiert nach Wichtigkeit und Aktualität.</p>
+
+{% if feed %}
+  {% for item in feed %}
+    <a class="thread-row" href="{{ url_for('thread_detail', thread_id=item.thread.id) }}">
+      <div class="thread-row-top">
+        {% if item.is_new %}<span class="new-badge">neu</span>{% endif %}
+        <span class="score-note">Score {{ "%.2f"|format(item.thread.importance_score) }} · Rang {{ "%.2f"|format(item.rank) }}</span>
+      </div>
+      <div class="thread-title">{{ item.thread.title }}</div>
+      <p class="thread-fact">{{ item.thread.fact_core[:140] }}{% if item.thread.fact_core|length > 140 %}…{% endif %}</p>
+    </a>
+  {% endfor %}
+{% else %}
+  <div class="empty-state">Keine Threads für dieses Thema.</div>
+{% endif %}
+{% endblock %}

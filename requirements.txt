@@ -1,0 +1,12 @@
+requests
+beautifulsoup4
+lxml
+numpy
+pandas
+scikit-learn
+yfinance           # echte, verifizierte Kursdaten fuer market_correlation.series,
+                   # s. pipeline/enrich_market_data.py (Nutzer-Feedback 24.08.2026)
+anthropic          # OPTIONAL: synthesize_story.py nutzt es, wenn installiert,
+                   # fällt sonst automatisch auf einen direkten HTTP-Call
+                   # gegen die Anthropic-API zurück (nur ANTHROPIC_API_KEY
+                   # + requests nötig, s. pipeline/synthesize_story.py::_create_message)
